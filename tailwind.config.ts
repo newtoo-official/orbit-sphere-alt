@@ -57,6 +57,12 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        scene: {
+          background: "hsl(var(--scene-background))",
+          sphere: "hsl(var(--sphere-color))",
+          ambient: "hsl(var(--sphere-ambient))",
+          light: "hsl(var(--light-color))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
