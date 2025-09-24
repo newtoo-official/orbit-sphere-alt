@@ -97,6 +97,54 @@ const YellowPoint = ({ position }: YellowPointProps) => {
   );
 };
 
+interface CatmullRomCurveProps {
+  points: Point[];
+  sphereRadius?: number;
+}
+
+const CatmullRomCurve = ({ points, sphereRadius = 1 }: CatmullRomCurveProps) => {
+  const [curveGeometry, setCurveGeometry] = useState<THREE.BufferGeometry | null>(null);
+
+  useEffect(() => {
+    if (points.length < 2) {
+      setCurveGeometry(null);
+      return;
+    }
+
+    // Create Catmull-Rom curve
+    const curvePoints = points.map(p => p.position);
+    const curve = new THREE.CatmullRomCurve3(curvePoints);
+    
+    // Get interpolated points (more points = smoother curve)
+    const numPoints = Math.max(50, points.length * 20);
+    const interpolatedPoints = curve.getPoints(numPoints);
+    
+    // Project each interpolated point onto the sphere surface
+    const projectedPoints = interpolatedPoints.map(point => {
+      const normalized = point.clone().normalize();
+      return normalized.multiplyScalar(sphereRadius);
+    });
+
+    // Create geometry from projected points
+    const geometry = new THREE.BufferGeometry().setFromPoints(projectedPoints);
+    setCurveGeometry(geometry);
+
+    // Cleanup previous geometry
+    return () => {
+      geometry.dispose();
+    };
+  }, [points, sphereRadius]);
+
+  if (!curveGeometry) return null;
+
+  return (
+    <primitive object={new THREE.Line(curveGeometry, new THREE.LineBasicMaterial({ 
+      color: "#ffd700",
+      linewidth: 3 
+    }))} />
+  );
+};
+
 export const Scene3D = () => {
   const [isControlsEnabled, setIsControlsEnabled] = useState(false);
   const [points, setPoints] = useState<Point[]>([]);
@@ -190,6 +238,9 @@ export const Scene3D = () => {
         {points.map(point => (
           <YellowPoint key={point.id} position={point.position} />
         ))}
+        
+        {/* Render Catmull-Rom curve */}
+        <CatmullRomCurve points={points} sphereRadius={1} />
         
         <OrbitControlsWrapper enabled={isControlsEnabled} />
       </Canvas>
