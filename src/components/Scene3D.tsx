@@ -1,14 +1,22 @@
 import { useRef, useState, useEffect } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Sphere } from '@react-three/drei';
 import * as THREE from 'three';
 
-interface SphereComponentProps {
-  color: string;
+interface Point {
+  id: string;
+  position: THREE.Vector3;
 }
 
-const SphereComponent = ({ color }: SphereComponentProps) => {
+interface SphereComponentProps {
+  color: string;
+  onSphereClick: (point: THREE.Vector3) => void;
+  altPressed: boolean;
+}
+
+const SphereComponent = ({ color, onSphereClick, altPressed }: SphereComponentProps) => {
   const meshRef = useRef<THREE.Mesh>(null);
+  const { raycaster, camera, mouse } = useThree();
 
   useFrame(() => {
     if (meshRef.current) {
@@ -17,8 +25,34 @@ const SphereComponent = ({ color }: SphereComponentProps) => {
     }
   });
 
+  const handleClick = (event: any) => {
+    if (altPressed || !meshRef.current) return;
+    
+    event.stopPropagation();
+    
+    // Update mouse coordinates
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    
+    // Update raycaster
+    raycaster.setFromCamera(mouse, camera);
+    
+    // Check for intersections with the sphere
+    const intersects = raycaster.intersectObject(meshRef.current);
+    
+    if (intersects.length > 0) {
+      const intersectionPoint = intersects[0].point;
+      onSphereClick(intersectionPoint);
+    }
+  };
+
   return (
-    <Sphere ref={meshRef} args={[1, 64, 64]} position={[0, 0, 0]}>
+    <Sphere 
+      ref={meshRef} 
+      args={[1, 64, 64]} 
+      position={[0, 0, 0]}
+      onClick={handleClick}
+    >
       <meshPhysicalMaterial
         color={color}
         roughness={0.1}
@@ -50,8 +84,22 @@ const OrbitControlsWrapper = ({ enabled }: OrbitControlsWrapperProps) => {
   );
 };
 
+interface YellowPointProps {
+  position: THREE.Vector3;
+}
+
+const YellowPoint = ({ position }: YellowPointProps) => {
+  return (
+    <mesh position={position}>
+      <sphereGeometry args={[0.02, 16, 16]} />
+      <meshBasicMaterial color="#ffd700" />
+    </mesh>
+  );
+};
+
 export const Scene3D = () => {
   const [isControlsEnabled, setIsControlsEnabled] = useState(false);
+  const [points, setPoints] = useState<Point[]>([]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -81,10 +129,20 @@ export const Scene3D = () => {
     };
   }, []);
 
+  const handleSphereClick = (position: THREE.Vector3) => {
+    const newPoint: Point = {
+      id: `point-${Date.now()}-${Math.random()}`,
+      position: position.clone()
+    };
+    setPoints(prev => [...prev, newPoint]);
+  };
+
   return (
     <div className="w-full h-screen bg-scene-background relative">
-      <div className="absolute top-4 left-4 z-10 text-foreground/70 text-sm">
-        {isControlsEnabled ? 'Hold Alt + Drag to orbit' : 'Hold Alt to enable orbit controls'}
+      <div className="absolute top-4 left-4 z-10 text-foreground/70 text-sm space-y-1">
+        <div>{isControlsEnabled ? 'Hold Alt + Drag to orbit' : 'Hold Alt to enable orbit controls'}</div>
+        <div>Click on sphere to add yellow points</div>
+        {points.length > 0 && <div className="text-xs text-foreground/50">Points: {points.length}</div>}
       </div>
       
       <Canvas
@@ -122,7 +180,17 @@ export const Scene3D = () => {
           color="#ffffff"
         />
 
-        <SphereComponent color="#f8f9fa" />
+        <SphereComponent 
+          color="#f8f9fa" 
+          onSphereClick={handleSphereClick}
+          altPressed={isControlsEnabled}
+        />
+        
+        {/* Render yellow points */}
+        {points.map(point => (
+          <YellowPoint key={point.id} position={point.position} />
+        ))}
+        
         <OrbitControlsWrapper enabled={isControlsEnabled} />
       </Canvas>
     </div>
